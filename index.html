@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Cube Stacker</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        body {
+            background-color: #f5f5f5;
+            padding: 10px;
+            touch-action: none;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 100%;
+            margin: 0 auto;
+            padding: 0 10px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 24px;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .value-selector {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            background: white;
+            padding: 5px 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .popup-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+        
+        .popup-overlay.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .popup {
+            background: white;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+            max-width: 300px;
+            width: 80%;
+            text-align: center;
+            transform: translateY(20px);
+            transition: transform 0.3s ease, opacity 0.3s ease;
+            opacity: 0;
+        }
+        
+        .popup.visible {
+            transform: translateY(0);
+            opacity: 1;
+        }
+        
+        .popup h3 {
+            margin: 0 0 15px 0;
+            color: #d32f2f;
+            font-size: 20px;
+        }
+        
+        .popup p {
+            margin: 0 0 20px 0;
+            color: #333;
+            font-size: 16px;
+            line-height: 1.4;
+        }
+        
+        .popup-button {
+            background-color: #1a73e8;
+            color: white;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .popup-button:hover {
+            background-color: #1557b0;
+        }
+        
+        .value-select {
+            width: 70px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+            font-weight: bold;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23333%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+            background-repeat: no-repeat;
+            background-position: right 8px center;
+            background-size: 10px auto;
+            padding-right: 25px;
+        }
+        
+        .value-select:focus {
+            outline: none;
+            border-color: #4285f4;
+            box-shadow: 0 0 0 2px rgba(66, 133, 244, 0.2);
+        }
+
+        button {
+            padding: 12px 20px;
+            font-size: 16px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            min-width: 100px;
+            font-weight: 600;
+        }
+
+        .add-button {
+            background-color: #4285f4;
+            color: white;
+            flex: 1;
+        }
+
+        .add-button:active {
+            background-color: #3367d6;
+            transform: scale(0.98);
+        }
+
+        .reset-button {
+            background-color: #ea4335;
+            color: white;
+            flex: 1;
+        }
+
+        .reset-button:active {
+            background-color: #d33426;
+            transform: scale(0.98);
+        }
+
+        .counter {
+            display: flex;
+            align-items: center;
+            font-size: 16px;
+            font-weight: bold;
+            background: white;
+            padding: 10px 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            flex: 0 0 100%;
+            justify-content: center;
+            margin-top: 10px;
+        }
+
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            width: 100%;
+            margin-top: 10px;
+            position: relative;
+            min-height: 60vh;
+        }
+
+        .cube-area, .combining-area {
+            position: relative;
+            width: 100%;
+            min-height: 200px;
+            border-radius: 12px;
+            padding: 15px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .cube-area {
+            border: 2px solid #4285f4;
+            background-color: #e8f0fe;
+            margin-bottom: 10px;
+        }
+
+        .cube-area h3 {
+            color: #1a73e8;
+            margin: 0 0 10px 0;
+            text-align: center;
+        }
+
+        .cube-area .plus-icon {
+            font-size: 40px;
+            color: #1a73e8;
+            margin: 5px 0;
+            text-align: center;
+        }
+
+        .combining-area {
+            border: 2px dashed #dadce0;
+            background-color: #f8f9fa;
+            flex: 1;
+            min-height: 300px;
+        }
+
+        .cube {
+            position: absolute;
+            width: 60px;
+            height: 60px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 24px;
+            cursor: move;
+            touch-action: none;
+            transition: transform 0.1s, box-shadow 0.1s;
+            box-shadow: 0 3px 6px rgba(0, 0, 0, 0.16);
+            z-index: 10;
+        }
+
+        .cube.dragging {
+            transform: scale(1.1);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+            opacity: 0.9;
+            z-index: 1000;
+        }
+
+        .instructions {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            font-size: 14px;
+        }
+
+        .instructions h3 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+
+        .instructions ul {
+            list-style-type: none;
+            padding-left: 15px;
+        }
+
+        .instructions li {
+            margin-bottom: 8px;
+            position: relative;
+            padding-left: 20px;
+        }
+
+        .instructions li:before {
+            content: '•';
+            position: absolute;
+            left: 0;
+            color: #4285f4;
+        }
+
+        @media (min-width: 768px) {
+            .game-container {
+                flex-direction: row;
+                min-height: 50vh;
+            }
+            
+            .cube-area {
+                width: 200px;
+                min-height: 300px;
+                margin-bottom: 0;
+            }
+            
+            .combining-area {
+                min-height: 400px;
+            }
+            
+            .controls {
+                flex-wrap: nowrap;
+            }
+            
+            .counter {
+                flex: 0 0 auto;
+                margin-top: 0;
+                padding: 8px 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Cube Stacker</h1>
+        <div class="controls">
+            <div class="value-selector">
+                <label for="cubeValue">Value:</label>
+                <select id="cubeValue" class="value-select">
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                    <option value="4">4</option>
+                    <option value="5">5</option>
+                    <option value="6">6</option>
+                    <option value="7">7</option>
+                    <option value="8">8</option>
+                    <option value="9">9</option>
+                    <option value="10">10</option>
+                </select>
+            </div>
+            <button id="addCube" class="add-button">+ Add Cube</button>
+            <button id="resetGame" class="reset-button">Reset</button>
+            <div class="counter">Cubes: <span id="cubeCount">0</span></div>
+        </div>
+        <div class="game-container">
+            <div class="cube-area" id="cubeArea">
+                <h3>Cube Area <span id="cubeCountDisplay">(0/6)</span></h3>
+                <div class="plus-icon">+</div>
+                <p>Use the "+ Add Cube" button</p>
+                <!-- Popup for warning message -->
+                <div id="warningPopup" class="popup-overlay">
+                    <div class="popup">
+                        <h3>Cube Limit Reached</h3>
+                        <p>You've reached the maximum number of cubes (6). Please combine some cubes in the Combining Area to make room for more.</p>
+                        <button id="closePopup" class="popup-button">Got it!</button>
+                    </div>
+                </div>
+            </div>
+            <div id="combiningArea" class="combining-area">
+                <div style="position: absolute; top: 10px; left: 10px; color: #5f6368; font-size: 16px; font-weight: bold; color: #1a73e8;">
+                    Combining Area
+                </div>
+                <div style="position: absolute; top: 40px; left: 10px; color: #5f6368; font-size: 14px;">
+                    Drag cubes here to combine them
+                </div>
+            </div>
+        </div>
+        
+        <div class="instructions">
+            <h3>How to Play:</h3>
+            <ul>
+                <li>Tap "+ Add Cube" to create a new cube</li>
+                <li>Drag cubes to the Combining Area</li>
+                <li>Drop one cube onto another to combine them</li>
+                <li>Create the highest number you can!</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const cubeArea = document.getElementById('cubeArea');
+            const combiningArea = document.getElementById('combiningArea');
+            const addButton = document.getElementById('addCube');
+            const resetButton = document.getElementById('resetGame');
+            const cubeCountElement = document.getElementById('cubeCount');
+            const cubeCountDisplay = document.getElementById('cubeCountDisplay');
+            const warningPopup = document.getElementById('warningPopup');
+            const closePopup = document.getElementById('closePopup');
+            const cubeValueSelect = document.getElementById('cubeValue');
+            
+            let cubeCount = 0;
+            let activeCube = null;
+            let offsetX = 0, offsetY = 0;
+            let highestValue = 0;
+            let isTouchDevice = 'ontouchstart' in window;
+
+            // Initialize the game
+            function init() {
+                // Add event listeners
+                addButton.addEventListener('click', addNewCube);
+                resetButton.addEventListener('click', resetGame);
+                closePopup.addEventListener('click', closeWarningPopup);
+                
+                // Add initial cube
+                addNewCube();
+            }
+
+            // Show warning popup
+            function showWarningPopup() {
+                warningPopup.classList.add('visible');
+                setTimeout(() => {
+                    warningPopup.querySelector('.popup').classList.add('visible');
+                }, 10);
+                
+                // Close popup when clicking outside
+                const outsideClick = (e) => {
+                    if (e.target === warningPopup) {
+                        closeWarningPopup();
+                        warningPopup.removeEventListener('click', outsideClick);
+                    }
+                };
+                warningPopup.addEventListener('click', outsideClick);
+            }
+            
+            // Close warning popup
+            function closeWarningPopup() {
+                warningPopup.querySelector('.popup').classList.remove('visible');
+                setTimeout(() => {
+                    warningPopup.classList.remove('visible');
+                }, 300);
+            }
+            
+            // Add new cube when clicking the add button
+            function addNewCube() {
+                const cubesInArea = cubeArea.querySelectorAll('.cube');
+                
+                // Check if we've reached the maximum number of cubes
+                if (cubesInArea.length >= 6) {
+                    showWarningPopup();
+                    return; // Don't add more than 6 cubes
+                }
+                
+                const cubeSize = 60;
+                const xPos = (cubeArea.offsetWidth - cubeSize) / 2;
+                
+                // Calculate y position based on existing cubes
+                let yPos = 60;
+                if (cubesInArea.length > 0) {
+                    const lastCube = cubesInArea[cubesInArea.length - 1];
+                    yPos = lastCube.offsetTop + lastCube.offsetHeight + 10;
+                }
+                
+                // Get the selected value from dropdown
+                const value = parseInt(cubeValueSelect.value) || 1;
+                
+                createCube(xPos, yPos, value, cubeArea);
+                
+                // Update cube count display
+                updateCubeCountDisplay();
+            }
+            
+            // Create a new cube element
+            function createCube(x, y, value, container) {
+                const cube = document.createElement('div');
+                cube.className = 'cube';
+                cube.textContent = value;
+                cube.dataset.value = value;
+                
+                // Position the cube
+                cube.style.left = `${x}px`;
+                cube.style.top = `${y}px`;
+                
+                // Apply styles based on value
+                const cubeStyles = getCubeStyle(value);
+                Object.assign(cube.style, cubeStyles);
+                
+                // Add event listeners for dragging
+                addDragListeners(cube);
+                
+                container.appendChild(cube);
+                cubeCount++;
+                updateCubeCount(1);
+                
+                return cube;
+            }
+            
+            // Get the style for a cube based on its value
+            function getCubeStyle(value) {
+                const style = {
+                    width: (40 + (value * 2)) + 'px',
+                    height: (40 + (value * 2)) + 'px',
+                    lineHeight: (40 + (value * 2)) + 'px',
+                    position: 'absolute',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontWeight: 'bold',
+                    fontSize: '20px',
+                    cursor: 'move',
+                    userSelect: 'none',
+                    boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
+                };
+                
+                // Set colors based on value
+                switch(parseInt(value)) {
+                    case 1:
+                        style.backgroundColor = '#ff4444'; // Red
+                        style.color = 'white';
+                        break;
+                    case 2:
+                        style.backgroundColor = '#ff8c00'; // Orange
+                        style.color = 'white';
+                        break;
+                    case 3:
+                        style.backgroundColor = '#ffd700'; // Yellow
+                        style.color = 'black';
+                        break;
+                    case 4:
+                        style.backgroundColor = '#4CAF50'; // Green
+                        style.color = 'white';
+                        break;
+                    case 5:
+                        style.backgroundColor = '#2196F3'; // Blue
+                        style.color = 'white';
+                        break;
+                    case 6:
+                        style.backgroundColor = '#9c27b0'; // Purple
+                        style.color = 'white';
+                        break;
+                    case 7:
+                        // Rainbow gradient
+                        style.background = 'linear-gradient(45deg, red, orange, yellow, green, blue, indigo, violet)';
+                        style.color = 'black';
+                        break;
+                    case 8:
+                        style.backgroundColor = '#e91e63'; // Pink
+                        style.color = 'white';
+                        break;
+                    case 9:
+                        style.backgroundColor = '#9e9e9e'; // Grey
+                        style.color = 'black';
+                        break;
+                    case 10:
+                        style.backgroundColor = '#ffffff'; // White
+                        style.border = '2px solid #ff4444';
+                        style.color = '#333';
+                        break;
+                    default:
+                        // For values beyond 10
+                        const hue = (value * 36) % 360;
+                        style.backgroundColor = `hsl(${hue}, 80%, 60%)`;
+                        style.color = value > 5 ? 'white' : 'black';
+                }
+                
+                return style;
+            }
+            
+            // Add drag event listeners to a cube
+            function addDragListeners(cube) {
+                // Touch events
+                cube.addEventListener('touchstart', handleTouchStart, { passive: false });
+                cube.addEventListener('touchmove', handleTouchMove, { passive: false });
+                cube.addEventListener('touchend', handleTouchEnd);
+                
+                // Mouse events
+                cube.addEventListener('mousedown', handleMouseDown);
+                
+                // Make draggable for desktop
+                cube.draggable = true;
+                cube.addEventListener('dragstart', handleDragStart);
+            }
+            
+            // Touch event handlers
+            function handleTouchStart(e) {
+                if (e.cancelable) e.preventDefault();
+                const touch = e.touches[0];
+                startDrag(touch.clientX, touch.clientY, this);
+            }
+            
+            function handleTouchMove(e) {
+                if (e.cancelable) e.preventDefault();
+                if (!activeCube) return;
+                
+                const touch = e.touches[0];
+                moveDrag(touch.clientX, touch.clientY);
+            }
+            
+            function handleTouchEnd() {
+                endDrag();
+            }
+            
+            // Mouse event handlers
+            function handleMouseDown(e) {
+                if (e.button !== 0) return; // Only left mouse button
+                startDrag(e.clientX, e.clientY, this);
+                
+                const moveHandler = (e) => {
+                    moveDrag(e.clientX, e.clientY);
+                };
+                
+                const upHandler = () => {
+                    document.removeEventListener('mousemove', moveHandler);
+                    document.removeEventListener('mouseup', upHandler);
+                    endDrag();
+                };
+                
+                document.addEventListener('mousemove', moveHandler);
+                document.addEventListener('mouseup', upHandler);
+            }
+            
+            function handleDragStart(e) {
+                // Only needed for desktop drag and drop
+                e.preventDefault();
+            }
+            
+            // Drag and drop functions
+            function startDrag(clientX, clientY, cube) {
+                activeCube = cube;
+                activeCube.classList.add('dragging');
+                
+                const rect = activeCube.getBoundingClientRect();
+                offsetX = clientX - rect.left;
+                offsetY = clientY - rect.top;
+                
+                // Move to body for smooth dragging
+                if (activeCube.parentElement === cubeArea || activeCube.parentElement === combiningArea) {
+                    document.body.appendChild(activeCube);
+                }
+                
+                // Update position
+                moveDrag(clientX, clientY);
+            }
+            
+            function moveDrag(clientX, clientY) {
+                if (!activeCube) return;
+                
+                // Calculate new position
+                const x = clientX - offsetX - window.scrollX;
+                const y = clientY - offsetY - window.scrollY;
+                
+                // Update cube position
+                activeCube.style.left = `${x}px`;
+                activeCube.style.top = `${y}px`;
+                
+                // Highlight drop zones
+                const cubeRect = activeCube.getBoundingClientRect();
+                const cubeCenterX = cubeRect.left + (cubeRect.width / 2);
+                const cubeCenterY = cubeRect.top + (cubeRect.height / 2);
+                
+                // Check if over combining area
+                const combiningRect = combiningArea.getBoundingClientRect();
+                const isOverCombining = (
+                    cubeCenterX >= combiningRect.left &&
+                    cubeCenterX <= combiningRect.right &&
+                    cubeCenterY >= combiningRect.top &&
+                    cubeCenterY <= combiningRect.bottom
+                );
+                
+                // Visual feedback for drop zones
+                if (isOverCombining) {
+                    combiningArea.style.borderColor = '#1a73e8';
+                    combiningArea.style.backgroundColor = '#e8f0fe';
+                } else {
+                    resetAreaStyles();
+                }
+            }
+            
+            function endDrag() {
+                if (!activeCube) return;
+                
+                const cubeRect = activeCube.getBoundingClientRect();
+                const cubeCenterX = cubeRect.left + (cubeRect.width / 2);
+                const cubeCenterY = cubeRect.top + (cubeRect.height / 2);
+                
+                // Check if dropped in combining area
+                const combiningRect = combiningArea.getBoundingClientRect();
+                const isOverCombining = (
+                    cubeCenterX >= combiningRect.left &&
+                    cubeCenterX <= combiningRect.right &&
+                    cubeCenterY >= combiningRect.top &&
+                    cubeCenterY <= combiningRect.bottom
+                );
+                
+                // Check for collisions with other cubes only in the combining area
+                let targetCube = null;
+                if (isOverCombining) {
+                    const allCubes = combiningArea.querySelectorAll('.cube');
+                    for (const cube of allCubes) {
+                        if (cube === activeCube) continue;
+                        
+                        const rect = cube.getBoundingClientRect();
+                        // Only combine if the center of the dragged cube is over the target cube
+                        if (
+                            cubeCenterX >= rect.left &&
+                            cubeCenterX <= rect.right &&
+                            cubeCenterY >= rect.top &&
+                            cubeCenterY <= rect.bottom
+                        ) {
+                            targetCube = cube;
+                            break;
+                        }
+                    }
+                }
+                
+                // Handle the drop
+                if (targetCube) {
+                    // Combine cubes
+                    combineCubes(activeCube, targetCube);
+                } else if (isOverCombining) {
+                    // Move to combining area at the exact drop position
+                    const containerRect = combiningArea.getBoundingClientRect();
+                    const x = cubeCenterX - containerRect.left - (activeCube.offsetWidth / 2);
+                    const y = cubeCenterY - containerRect.top - (activeCube.offsetHeight / 2);
+                    
+                    // Ensure position is within bounds
+                    const maxX = containerRect.width - activeCube.offsetWidth;
+                    const maxY = containerRect.height - activeCube.offsetHeight;
+                    
+                    activeCube.style.left = `${Math.max(0, Math.min(x, maxX))}px`;
+                    activeCube.style.top = `${Math.max(0, Math.min(y, maxY))}px`;
+                    
+                    // Set the container and update data attribute
+                    activeCube.dataset.originalContainer = 'combining';
+                    combiningArea.appendChild(activeCube);
+                    
+                    // Update cube count display
+                    updateCubeCountDisplay();
+                } else {
+                    // Return to original container but keep the position
+                    if (activeCube.parentElement === document.body) {
+                        const originalContainer = activeCube.dataset.originalContainer === 'combining' ? combiningArea : cubeArea;
+                        const containerRect = originalContainer.getBoundingClientRect();
+                        
+                        // Calculate position relative to the original container
+                        const x = cubeCenterX - containerRect.left - (activeCube.offsetWidth / 2);
+                        const y = cubeCenterY - containerRect.top - (activeCube.offsetHeight / 2);
+                        
+                        // Ensure position is within bounds
+                        const maxX = containerRect.width - activeCube.offsetWidth;
+                        const maxY = containerRect.height - activeCube.offsetHeight;
+                        
+                        activeCube.style.left = `${Math.max(0, Math.min(x, maxX))}px`;
+                        activeCube.style.top = `${Math.max(0, Math.min(y, maxY))}px`;
+                        
+                        originalContainer.appendChild(activeCube);
+                    }
+                }
+                
+                // Clean up
+                resetAreaStyles();
+                activeCube.classList.remove('dragging');
+                activeCube = null;
+            }
+            
+            // Combine two cubes
+            function combineCubes(cube1, cube2) {
+                const value1 = parseInt(cube1.dataset.value);
+                const value2 = parseInt(cube2.dataset.value);
+                const newValue = value1 + value2;
+                
+                // Get position of the cube that was dropped onto (cube2)
+                const container = cube2.parentElement;
+                const rect = cube2.getBoundingClientRect();
+                const containerRect = container.getBoundingClientRect();
+                
+                // Calculate position relative to container
+                const x = rect.left - containerRect.left;
+                const y = rect.top - containerRect.top;
+                
+                // Remove the original cubes
+                cube1.remove();
+                cube2.remove();
+                
+                // Create a new combined cube at the exact position of cube2
+                const newCube = createCube(x, y, newValue, container);
+                
+                // Update highest value if needed
+                if (newValue > highestValue) {
+                    highestValue = newValue;
+                    document.title = `Cube Stacker - ${highestValue}`;
+                }
+                
+                // Update cube count (we removed 2 cubes and added 1)
+                updateCubeCount(-1);
+                
+                // Don't check for additional combinations to prevent unwanted movements
+            }
+            
+            // Check for possible combinations with the dropped cube
+            // This function is kept for reference but not used to prevent unwanted combinations
+            function checkForCombinations(droppedCube) {
+                // Intentionally left empty to prevent automatic combinations
+                // Cubes will only combine when explicitly dropped onto each other
+            }
+            
+            // Reset area styles
+            function resetAreaStyles() {
+                combiningArea.style.borderColor = '#dadce0';
+                combiningArea.style.backgroundColor = '#f8f9fa';
+            }
+            
+            // Update cube appearance based on value
+            function updateCubeAppearance(cube) {
+                const value = parseInt(cube.dataset.value);
+                const styles = getCubeStyle(value);
+                Object.assign(cube.style, styles);
+            }
+            
+            // Update cube counter
+            function updateCubeCount(change) {
+                cubeCount += change;
+                cubeCountElement.textContent = cubeCount;
+                
+                // Update cube count display
+                const cubesInArea = cubeArea.querySelectorAll('.cube').length;
+                cubeCountDisplay.textContent = `(${cubesInArea}/6)`;
+            }
+            
+            // Update cube count display
+            function updateCubeCountDisplay() {
+                const cubesInArea = cubeArea.querySelectorAll('.cube').length;
+                cubeCountDisplay.textContent = `(${cubesInArea}/6)`;
+            }
+            
+            // Reset the game
+            function resetGame() {
+                if (confirm('Are you sure you want to reset the game? This will remove all cubes.')) {
+                    // Remove all cubes
+                    const cubes = document.querySelectorAll('.cube');
+                    cubes.forEach(cube => cube.remove());
+                    
+                    // Reset counters
+                    cubeCount = 0;
+                    highestValue = 0;
+                    cubeCountElement.textContent = '0';
+                    document.title = 'Cube Stacker';
+                    
+                    // Reset cube count display
+                    cubeCountDisplay.textContent = '(0/6)';
+                    
+                    // Add initial cube
+                    addNewCube();
+                }
+            }
+            
+            // Prevent default touch behavior
+            document.addEventListener('touchmove', (e) => {
+                if (activeCube && e.cancelable) {
+                    e.preventDefault();
+                }
+            }, { passive: false });
+            
+            // Initialize the game
+            init();
+        });
+    </script>
+</body>
+</html>
