@@ -570,7 +570,11 @@
             
             let cubeCount = 0;
             let activeCube = null;
-            let offsetX = 0, offsetY = 0;
+            let offsetX = 0;
+            let offsetY = 0;
+            let isDragging = false;
+            let startX = 0;
+            let startY = 0;
             let highestValue = 0;
             let isTouchDevice = 'ontouchstart' in window;
 
@@ -782,7 +786,16 @@
                 if (!activeCube) return;
                 
                 const touch = e.touches[0];
-                moveDrag(touch.clientX, touch.clientY);
+                const dx = Math.abs(touch.clientX - startX);
+                const dy = Math.abs(touch.clientY - startY);
+                
+                if (dx > 5 || dy > 5) {
+                    isDragging = true;
+                }
+                
+                if (isDragging) {
+                    moveDrag(touch.clientX, touch.clientY);
+                }
             }
             
             function handleTouchEnd() {
@@ -816,7 +829,9 @@
             // Drag and drop functions
             function startDrag(clientX, clientY, cube) {
                 activeCube = cube;
-                activeCube.classList.add('dragging');
+                isDragging = false;
+                startX = clientX;
+                startY = clientY;
                 
                 const rect = activeCube.getBoundingClientRect();
                 offsetX = clientX - rect.left;
@@ -866,89 +881,15 @@
             
             function endDrag() {
                 if (!activeCube) return;
-                
-                const cubeRect = activeCube.getBoundingClientRect();
-                const cubeCenterX = cubeRect.left + (cubeRect.width / 2);
-                const cubeCenterY = cubeRect.top + (cubeRect.height / 2);
-                
-                // Check if dropped in combining area
-                const combiningRect = combiningArea.getBoundingClientRect();
-                const isOverCombining = (
-                    cubeCenterX >= combiningRect.left &&
-                    cubeCenterX <= combiningRect.right &&
-                    cubeCenterY >= combiningRect.top &&
-                    cubeCenterY <= combiningRect.bottom
-                );
-                
-                // Check for collisions with other cubes only in the combining area
-                let targetCube = null;
-                if (isOverCombining) {
-                    const allCubes = combiningArea.querySelectorAll('.cube');
-                    for (const cube of allCubes) {
-                        if (cube === activeCube) continue;
-                        
-                        const rect = cube.getBoundingClientRect();
-                        // Only combine if the center of the dragged cube is over the target cube
-                        if (
-                            cubeCenterX >= rect.left &&
-                            cubeCenterX <= rect.right &&
-                            cubeCenterY >= rect.top &&
-                            cubeCenterY <= rect.bottom
-                        ) {
-                            targetCube = cube;
-                            break;
-                        }
-                    }
+
+                if (isDragging) {
+                    activeCube.classList.remove('dragging');
+                    handleDrop();
                 }
                 
-                // Handle the drop
-                if (targetCube) {
-                    // Combine cubes
-                    combineCubes(activeCube, targetCube);
-                } else if (isOverCombining) {
-                    // Move to combining area at the exact drop position
-                    const containerRect = combiningArea.getBoundingClientRect();
-                    const x = cubeCenterX - containerRect.left - (activeCube.offsetWidth / 2);
-                    const y = cubeCenterY - containerRect.top - (activeCube.offsetHeight / 2);
-                    
-                    // Ensure position is within bounds
-                    const maxX = containerRect.width - activeCube.offsetWidth;
-                    const maxY = containerRect.height - activeCube.offsetHeight;
-                    
-                    activeCube.style.left = `${Math.max(0, Math.min(x, maxX))}px`;
-                    activeCube.style.top = `${Math.max(0, Math.min(y, maxY))}px`;
-                    
-                    // Set the container and update data attribute
-                    activeCube.dataset.originalContainer = 'combining';
-                    combiningArea.appendChild(activeCube);
-                    
-                    // Update cube count display
-                    updateCubeCountDisplay();
-                } else {
-                    // Return to original container but keep the position
-                    if (activeCube.parentElement === document.body) {
-                        const originalContainer = activeCube.dataset.originalContainer === 'combining' ? combiningArea : cubeArea;
-                        const containerRect = originalContainer.getBoundingClientRect();
-                        
-                        // Calculate position relative to the original container
-                        const x = cubeCenterX - containerRect.left - (activeCube.offsetWidth / 2);
-                        const y = cubeCenterY - containerRect.top - (activeCube.offsetHeight / 2);
-                        
-                        // Ensure position is within bounds
-                        const maxX = containerRect.width - activeCube.offsetWidth;
-                        const maxY = containerRect.height - activeCube.offsetHeight;
-                        
-                        activeCube.style.left = `${Math.max(0, Math.min(x, maxX))}px`;
-                        activeCube.style.top = `${Math.max(0, Math.min(y, maxY))}px`;
-                        
-                        originalContainer.appendChild(activeCube);
-                    }
-                }
-                
-                // Clean up
-                resetAreaStyles();
-                activeCube.classList.remove('dragging');
                 activeCube = null;
+                isDragging = false;
+                clearDropZoneHighlights();
             }
             
             // Combine two cubes
@@ -991,7 +932,7 @@
             }
             
             // Check for possible combinations with the dropped cube
-            // This function is kept for reference but not used to prevent unwanted combinations
+            // This function is kept for reference but not used to prevent automatic combinations
             function checkForCombinations(droppedCube) {
                 // Intentionally left empty to prevent automatic combinations
                 // Cubes will only combine when explicitly dropped onto each other
@@ -1051,7 +992,7 @@
             
             // Prevent default touch behavior
             document.addEventListener('touchmove', (e) => {
-                if (activeCube && e.cancelable) {
+                if (activeCube && isDragging && e.cancelable) {
                     e.preventDefault();
                 }
             }, { passive: false });
