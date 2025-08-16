@@ -563,6 +563,7 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
+            // Game elements
             const cubeArea = document.getElementById('cubeArea');
             const combiningArea = document.getElementById('combiningArea');
             const addButton = document.getElementById('addCube');
@@ -573,17 +574,14 @@
             const closePopup = document.getElementById('closePopup');
             const cubeValueSelect = document.getElementById('cubeValue');
             
+            // Game state
             let cubeCount = 0;
             let activeCube = null;
             let offsetX = 0;
             let offsetY = 0;
-            let isDragging = false;
-            let isScrolling = false;
-            let startX = 0;
-            let startY = 0;
             let highestValue = 0;
             let isTouchDevice = 'ontouchstart' in window;
-
+            
             // Initialize the game
             function init() {
                 // Add event listeners
@@ -593,6 +591,397 @@
                 
                 // Add initial cube
                 addNewCube();
+            }
+            
+            // Add new cube when clicking the add button
+            function addNewCube() {
+                const cubesInArea = cubeArea.querySelectorAll('.cube');
+                
+                // Check if we've reached the maximum number of cubes
+                if (cubesInArea.length >= 6) {
+                    showWarningPopup();
+                    // Add shake animation to button for feedback
+                    addButton.style.animation = 'shake 0.5s ease-in-out';
+                    setTimeout(() => {
+                        addButton.style.animation = '';
+                    }, 500);
+                    return; // Don't add more than 6 cubes
+                }
+                
+                const cubeSize = 60;
+                const xPos = (cubeArea.offsetWidth - cubeSize) / 2;
+                
+                // Calculate y position based on existing cubes
+                let yPos = 60;
+                if (cubesInArea.length > 0) {
+                    const lastCube = cubesInArea[cubesInArea.length - 1];
+                    yPos = lastCube.offsetTop + lastCube.offsetHeight + 10;
+                }
+                
+                // Get the selected value from dropdown
+                const value = parseInt(cubeValueSelect.value) || 1;
+                
+                createCube(xPos, yPos, value, cubeArea);
+                
+                // Update cube count display
+                updateCubeCountDisplay();
+            }
+            
+            // Create a new cube element
+            function createCube(x, y, value, container) {
+                const cube = document.createElement('div');
+                cube.className = 'cube';
+                cube.innerHTML = `<span class="num">${value}</span>`;
+                cube.dataset.value = value;
+                
+                // Position the cube
+                cube.style.left = `${x}px`;
+                cube.style.top = `${y}px`;
+                
+                // Apply styles based on value
+                const cubeStyles = getCubeStyle(value);
+                Object.assign(cube.style, cubeStyles);
+                
+                // Add event listeners for dragging
+                addDragListeners(cube);
+                
+                container.appendChild(cube);
+                cubeCount++;
+                updateCubeCount(1);
+                
+                return cube;
+            }
+            
+            // Get the style for a cube based on its value
+            function getCubeStyle(value) {
+                const style = {
+                    width: (40 + (value * 2)) + 'px',
+                    height: (40 + (value * 2)) + 'px',
+                    lineHeight: (40 + (value * 2)) + 'px',
+                    position: 'absolute',
+                    borderRadius: '16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontWeight: 'bold',
+                    fontSize: '20px',
+                    cursor: 'move',
+                    userSelect: 'none',
+                    boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
+                };
+                
+                // Set colors based on value
+                const colors = [
+                    '#ff4444', // Red
+                    '#ff8c00', // Orange
+                    '#ffd700', // Yellow
+                    '#4CAF50', // Green
+                    '#2196F3', // Blue
+                    '#9c27b0'  // Purple
+                ];
+                
+                const colorIndex = (value - 1) % colors.length;
+                style.backgroundColor = colors[colorIndex];
+                style.color = value <= 2 ? 'white' : 'black';
+                
+                return style;
+            }
+            
+            // Add drag event listeners to a cube
+            function addDragListeners(cube) {
+                // Touch events
+                cube.addEventListener('touchstart', handleTouchStart, { passive: false });
+                cube.addEventListener('touchmove', handleTouchMove, { passive: false });
+                cube.addEventListener('touchend', handleTouchEnd);
+                
+                // Mouse events
+                cube.addEventListener('mousedown', handleMouseDown);
+                
+                // Make draggable for desktop
+                cube.draggable = true;
+                cube.addEventListener('dragstart', handleDragStart);
+            }
+            
+            // Touch event handlers
+            function handleTouchStart(e) {
+                if (e.touches.length !== 1) return;
+                const touch = e.touches[0];
+                activeCube = this;
+                
+                const rect = activeCube.getBoundingClientRect();
+                offsetX = touch.clientX - rect.left;
+                offsetY = touch.clientY - rect.top;
+                
+                // Move to body for smooth dragging
+                if (activeCube.parentElement === cubeArea || activeCube.parentElement === combiningArea) {
+                    document.body.appendChild(activeCube);
+                }
+                
+                // Position the cube at the touch point
+                moveDrag(touch.clientX, touch.clientY);
+            }
+            
+            function handleTouchMove(e) {
+                if (!activeCube) return;
+                e.preventDefault();
+                
+                const touch = e.touches[0];
+                moveDrag(touch.clientX, touch.clientY);
+            }
+            
+            function handleTouchEnd() {
+                endDrag();
+            }
+            
+            // Mouse event handlers
+            function handleMouseDown(e) {
+                if (e.button !== 0) return; // Only left mouse button
+                activeCube = this;
+                
+                const rect = activeCube.getBoundingClientRect();
+                offsetX = e.clientX - rect.left;
+                offsetY = e.clientY - rect.top;
+                
+                // Move to body for smooth dragging
+                if (activeCube.parentElement === cubeArea || activeCube.parentElement === combiningArea) {
+                    document.body.appendChild(activeCube);
+                }
+                
+                const moveHandler = (e) => {
+                    moveDrag(e.clientX, e.clientY);
+                };
+                
+                const upHandler = () => {
+                    endDrag();
+                    document.removeEventListener('mousemove', moveHandler);
+                    document.removeEventListener('mouseup', upHandler);
+                };
+                
+                document.addEventListener('mousemove', moveHandler);
+                document.addEventListener('mouseup', upHandler);
+            }
+            
+            function handleDragStart(e) {
+                // Only needed for desktop drag and drop
+                e.preventDefault();
+            }
+            
+            // Drag and drop functions
+            function startDrag(clientX, clientY, cube) {
+                activeCube = cube;
+                const rect = activeCube.getBoundingClientRect();
+                offsetX = clientX - rect.left;
+                offsetY = clientY - rect.top;
+                
+                // Move to body for smooth dragging
+                if (activeCube.parentElement === cubeArea || activeCube.parentElement === combiningArea) {
+                    document.body.appendChild(activeCube);
+                }
+                
+                moveDrag(clientX, clientY);
+            }
+            
+            function moveDrag(clientX, clientY) {
+                if (!activeCube) return;
+                
+                // Calculate new position
+                const x = clientX - offsetX - window.scrollX;
+                const y = clientY - offsetY - window.scrollY;
+                
+                activeCube.style.left = `${x}px`;
+                activeCube.style.top = `${y}px`;
+                
+                // Check for drop zones
+                checkDropZones();
+            }
+            
+            function endDrag() {
+                if (!activeCube) return;
+                
+                activeCube.classList.remove('dragging');
+                handleDrop();
+                
+                activeCube = null;
+                clearDropZoneHighlights();
+            }
+            
+            // Handle when a cube is dropped
+            function handleDrop() {
+                const droppedCube = activeCube;
+                let inCombiningArea = false;
+                
+                // Check if dropped in combining area
+                if (isOverArea(droppedCube, combiningArea)) {
+                    inCombiningArea = true;
+                    
+                    // Check for combination
+                    const cubesInCombining = combiningArea.querySelectorAll('.cube');
+                    let combined = false;
+                    
+                    for (const staticCube of cubesInCombining) {
+                        if (staticCube !== droppedCube && isOverArea(droppedCube, staticCube)) {
+                            combineCubes(droppedCube, staticCube);
+                            combined = true;
+                            break;
+                        }
+                    }
+                    
+                    if (!combined) {
+                        // Just add to combining area if no combination
+                        combiningArea.appendChild(droppedCube);
+                        positionCubeInArea(droppedCube, combiningArea);
+                    }
+                } else {
+                    // Return to cube area if not in combining area
+                    cubeArea.appendChild(droppedCube);
+                    positionCubeInArea(droppedCube, cubeArea);
+                }
+            }
+            
+            // Position a cube within an area
+            function positionCubeInArea(cube, area) {
+                const areaRect = area.getBoundingClientRect();
+                const cubeRect = cube.getBoundingClientRect();
+                
+                // Center the cube in the area
+                const x = (areaRect.width - cubeRect.width) / 2;
+                const y = (areaRect.height - cubeRect.height) / 2;
+                
+                cube.style.left = `${x}px`;
+                cube.style.top = `${y}px`;
+            }
+            
+            // Check if one element is over another
+            function isOverArea(element1, element2) {
+                const rect1 = element1.getBoundingClientRect();
+                const rect2 = element2.getBoundingClientRect();
+                
+                return (
+                    rect1.left < rect2.right &&
+                    rect1.right > rect2.left &&
+                    rect1.top < rect2.bottom &&
+                    rect1.bottom > rect2.top
+                );
+            }
+            
+            // Highlight drop zones when dragging over them
+            function checkDropZones() {
+                if (!activeCube) return;
+                
+                if (isOverArea(activeCube, combiningArea)) {
+                    combiningArea.classList.add('highlight');
+                } else {
+                    combiningArea.classList.remove('highlight');
+                }
+            }
+            
+            // Clear all drop zone highlights
+            function clearDropZoneHighlights() {
+                combiningArea.classList.remove('highlight');
+            }
+            
+            // Combine two cubes
+            function combineCubes(cube1, cube2) {
+                const value1 = parseInt(cube1.dataset.value);
+                const value2 = parseInt(cube2.dataset.value);
+                const newValue = value1 + value2;
+                
+                // Remove both cubes
+                cube1.remove();
+                cube2.remove();
+                
+                // Create new combined cube
+                const newCube = createCube(0, 0, newValue, combiningArea);
+                
+                // Position the new cube
+                const rect = combiningArea.getBoundingClientRect();
+                const x = (rect.width - newCube.offsetWidth) / 2;
+                const y = (rect.height - newCube.offsetHeight) / 2;
+                
+                newCube.style.left = `${x}px`;
+                newCube.style.top = `${y}px`;
+                
+                // Update highest value if needed
+                if (newValue > highestValue) {
+                    highestValue = newValue;
+                    document.title = `Block Playground 🧱 - ${highestValue}`;
+                }
+                
+                // Update cube count (we removed 2 cubes and added 1)
+                updateCubeCount(-1);
+            }
+            
+            // Show warning popup
+            function showWarningPopup() {
+                warningPopup.classList.add('visible');
+                setTimeout(() => {
+                    warningPopup.querySelector('.popup').classList.add('visible');
+                }, 10);
+                
+                // Close popup when clicking outside
+                const outsideClick = (e) => {
+                    if (e.target === warningPopup) {
+                        closeWarningPopup();
+                        warningPopup.removeEventListener('click', outsideClick);
+                    }
+                };
+                warningPopup.addEventListener('click', outsideClick);
+            }
+            
+            // Close warning popup
+            function closeWarningPopup() {
+                warningPopup.querySelector('.popup').classList.remove('visible');
+                setTimeout(() => {
+                    warningPopup.classList.remove('visible');
+                }, 300);
+            }
+            
+            // Update cube appearance based on value
+            function updateCubeAppearance(cube) {
+                const value = parseInt(cube.dataset.value);
+                const styles = getCubeStyle(value);
+                Object.assign(cube.style, styles);
+            }
+            
+            // Update cube counter
+            function updateCubeCount(change) {
+                cubeCount += change;
+                cubeCountElement.textContent = cubeCount;
+                
+                // Update cube count display
+                updateCubeCountDisplay();
+            }
+            
+            // Update cube count display
+            function updateCubeCountDisplay() {
+                const cubesInArea = cubeArea.querySelectorAll('.cube').length;
+                cubeCountDisplay.textContent = `(${cubesInArea}/6)`;
+            }
+            
+            // Reset the game
+            function resetGame() {
+                if (confirm('Start over? This will clear your blocks so you can play again!')) {
+                    // Remove all cubes
+                    const cubes = document.querySelectorAll('.cube');
+                    cubes.forEach(cube => cube.remove());
+                    
+                    // Reset counters
+                    cubeCount = 0;
+                    highestValue = 0;
+                    cubeCountElement.textContent = '0';
+                    document.title = 'Block Playground ';
+                    
+                    // Add initial cube
+                    addNewCube();
+                }
+            }
+            
+            // Initialize the game
+            init();
+        });
+    </script>
+</body>
+</html>
 
                 // Cleanup any existing face/eye/smile elements from older blocks
                 document.querySelectorAll('.smile, .eye, .face').forEach(el => el.remove());
@@ -728,239 +1117,354 @@
                         break;
                     case 6:
                         style.backgroundColor = '#9c27b0'; // Purple
-                        style.color = 'white';
-                        break;
-                    case 7:
-                        // Rainbow gradient
-                        style.background = 'linear-gradient(45deg, red, orange, yellow, green, blue, indigo, violet)';
-                        style.color = 'black';
-                        break;
-                    case 8:
-                        style.backgroundColor = '#e91e63'; // Pink
-                        style.color = 'white';
-                        break;
-                    case 9:
-                        style.backgroundColor = '#9e9e9e'; // Grey
-                        style.color = 'black';
-                        break;
-                    case 10:
-                        style.backgroundColor = '#ffffff'; // White
-                        style.border = '2px solid #ff4444';
-                        style.color = '#333';
-                        break;
-                    default:
-                        // For values beyond 10
-                        const hue = (value * 36) % 360;
-                        style.backgroundColor = `hsl(${hue}, 80%, 60%)`;
-                        style.color = value > 5 ? 'white' : 'black';
-                }
-                
-                return style;
+
+    // Show warning popup
+    function showWarningPopup() {
+        warningPopup.classList.add('visible');
+        setTimeout(() => {
+            warningPopup.querySelector('.popup').classList.add('visible');
+        }, 10);
+        
+        // Close popup when clicking outside
+        const outsideClick = (e) => {
+            if (e.target === warningPopup) {
+                closeWarningPopup();
+                warningPopup.removeEventListener('click', outsideClick);
             }
-            
-            // Add drag event listeners to a cube
-            function addDragListeners(cube) {
-                // Touch events
-                cube.addEventListener('touchstart', handleTouchStart, { passive: false });
-                cube.addEventListener('touchmove', handleTouchMove, { passive: false });
-                cube.addEventListener('touchend', handleTouchEnd);
-                
-                // Mouse events
-                cube.addEventListener('mousedown', handleMouseDown);
-                
-                // Make draggable for desktop
-                cube.draggable = true;
-                cube.addEventListener('dragstart', handleDragStart);
+        };
+        warningPopup.addEventListener('click', outsideClick);
+    }
+    
+    // Close warning popup
+    function closeWarningPopup() {
+        warningPopup.querySelector('.popup').classList.remove('visible');
+        setTimeout(() => {
+            warningPopup.classList.remove('visible');
+        }, 300);
+    }
+    
+    // Add new cube when clicking the add button
+    function addNewCube() {
+        const cubesInArea = cubeArea.querySelectorAll('.cube');
+        
+        // Check if we've reached the maximum number of cubes
+        if (cubesInArea.length >= 6) {
+            showWarningPopup();
+            // Add shake animation to button for feedback
+            addButton.style.animation = 'shake 0.5s ease-in-out';
+            setTimeout(() => {
+                addButton.style.animation = '';
+            }, 500);
+            return; // Don't add more than 6 cubes
+        }
+        
+        const cubeSize = 60;
+        const xPos = (cubeArea.offsetWidth - cubeSize) / 2;
+        
+        // Calculate y position based on existing cubes
+        let yPos = 60;
+        if (cubesInArea.length > 0) {
+            const lastCube = cubesInArea[cubesInArea.length - 1];
+            yPos = lastCube.offsetTop + lastCube.offsetHeight + 10;
+        }
+        
+        // Get the selected value from dropdown
+        const value = parseInt(cubeValueSelect.value) || 1;
+        
+        createCube(xPos, yPos, value, cubeArea);
+        
+        // Update cube count display
+        updateCubeCountDisplay();
+    }
+    
+    // Create a new cube element
+    function createCube(x, y, value, container) {
+        const cube = document.createElement('div');
+        cube.className = 'cube';
+        cube.innerHTML = `<span class="num">${value}</span>`;
+        cube.dataset.value = value;
+        
+        // Position the cube
+        cube.style.left = `${x}px`;
+        cube.style.top = `${y}px`;
+        
+        // Apply styles based on value
+        const cubeStyles = getCubeStyle(value);
+        Object.assign(cube.style, cubeStyles);
+        // Expose size to CSS via custom property for proportional face sizing
+        if (cubeStyles.width) {
+            cube.style.setProperty('--size', cubeStyles.width);
+        }
+        
+        // Add event listeners for dragging
+        addDragListeners(cube);
+        
+        container.appendChild(cube);
+        cubeCount++;
+        updateCubeCount(1);
+        
+        // Add pop animation
+        cube.classList.add('pop');
+        cube.addEventListener('animationend', () => {
+            cube.classList.remove('pop');
+        }, { once: true });
+        
+        return cube;
+    }
+    
+    // Get the style for a cube based on its value
+    function getCubeStyle(value) {
+        const style = {
+            width: (40 + (value * 2)) + 'px',
+            height: (40 + (value * 2)) + 'px',
+            lineHeight: (40 + (value * 2)) + 'px',
+            position: 'absolute',
+            borderRadius: '16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontWeight: 'bold',
+            fontSize: '20px',
+            cursor: 'move',
+            userSelect: 'none',
+            boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
+        };
+        
+        // Previous bold color definition
+        switch(parseInt(value)) {
+            case 1:
+                style.backgroundColor = '#ff4444'; // Red
+                style.color = 'white';
+                break;
+            case 2:
+                style.backgroundColor = '#ff8c00'; // Orange
+                style.color = 'white';
+                break;
+            case 3:
+                style.backgroundColor = '#ffd700'; // Yellow
+                style.color = 'black';
+                break;
+            case 4:
+                style.backgroundColor = '#4CAF50'; // Green
+                style.color = 'white';
+                break;
+            case 5:
+                style.backgroundColor = '#2196F3'; // Blue
+                style.color = 'white';
+                break;
+            case 6:
+                style.backgroundColor = '#9c27b0'; // Purple
+                style.color = 'white';
+                break;
+            case 7:
+                // Rainbow gradient
+                style.background = 'linear-gradient(45deg, red, orange, yellow, green, blue, indigo, violet)';
+                style.color = 'black';
+                break;
+            case 8:
+                style.backgroundColor = '#e91e63'; // Pink
+                style.color = 'white';
+                break;
+            case 9:
+                style.backgroundColor = '#9e9e9e'; // Grey
+                style.color = 'black';
+                break;
+            case 10:
+                style.backgroundColor = '#ffffff'; // White
+                style.border = '2px solid #ff4444';
+                style.color = '#333';
+                break;
+            default:
+                // For values beyond 10
+                const hue = (value * 36) % 360;
+                style.backgroundColor = `hsl(${hue}, 80%, 60%)`;
+                style.color = value > 5 ? 'white' : 'black';
+        }
+        
+        return style;
+    }
+    
+    // Add drag event listeners to a cube
+    function addDragListeners(cube) {
+        // Touch events
+        cube.addEventListener('touchstart', handleTouchStart, { passive: false });
+        cube.addEventListener('touchmove', handleTouchMove, { passive: false });
+        cube.addEventListener('touchend', handleTouchEnd);
+        
+        // Mouse events
+        cube.addEventListener('mousedown', handleMouseDown);
+        
+        // Make draggable for desktop
+        cube.draggable = true;
+        cube.addEventListener('dragstart', handleDragStart);
+    }
+    
+    function handleDrop() {
+        const droppedCube = activeCube;
+        if (!droppedCube) return;
+
+        // Find which cube it was dropped on, if any
+        let targetCube = null;
+        const cubesInCombining = combiningArea.querySelectorAll('.cube');
+        for (const staticCube of cubesInCombining) {
+            if (staticCube !== droppedCube && isOverlapping(droppedCube, staticCube)) {
+                targetCube = staticCube;
+                break;
             }
-            
-            // Touch event handlers
-            function handleTouchStart(e) {
-                if (e.touches.length !== 1) return;
-                const touch = e.touches[0];
-                startX = touch.clientX;
-                startY = touch.clientY;
-                isDragging = false;
-                isScrolling = false;
-                activeCube = this;
+        }
 
-                // Add visual feedback for touch
-                this.classList.add('touched');
-            }
+        if (targetCube) {
+            // Dropped on another cube, combine them
+            combineCubes(droppedCube, targetCube);
+        } else if (isOverlapping(droppedCube, combiningArea)) {
+            // Dropped in the combining area, but not on a cube
+            combiningArea.appendChild(droppedCube);
+            // Center it where it was dropped
+            const combiningRect = combiningArea.getBoundingClientRect();
+            const droppedRect = droppedCube.getBoundingClientRect();
+            const scrollX = window.scrollX || document.documentElement.scrollLeft;
+            const scrollY = window.scrollY || document.documentElement.scrollTop;
 
-            function handleTouchMove(e) {
-                if (!activeCube || e.touches.length !== 1) return;
+            let newLeft = droppedRect.left - combiningRect.left + scrollX;
+            let newTop = droppedRect.top - combiningRect.top + scrollY;
 
-                const touch = e.touches[0];
-                const dx = touch.clientX - startX;
-                const dy = touch.clientY - startY;
+            // Constrain to bounds
+            newLeft = Math.max(0, Math.min(newLeft, combiningRect.width - droppedRect.width));
+            newTop = Math.max(0, Math.min(newTop, combiningRect.height - droppedRect.height));
 
-                if (!isDragging && !isScrolling) {
-                    // Determine if it's a scroll or a drag
-                    if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 5) {
-                        isScrolling = true;
-                        activeCube.classList.remove('touched');
-                        activeCube = null;
-                        return;
-                    } else if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 5) {
-                        isDragging = true;
-                        document.body.classList.add('no-scroll');
-                        activeCube.classList.add('dragging');
-                        startDrag(startX, startY, activeCube);
-                    }
-                }
+            droppedCube.style.left = `${newLeft}px`;
+            droppedCube.style.top = `${newTop}px`;
+        } else {
+            // Not in a valid drop zone, remove it
+            droppedCube.remove();
+            updateCubeCount(-1);
+            showPopup("Block removed! Drop it in the Mix & Match Zone.");
+        }
+    }
+    
+    // Touch event handlers
+    function handleTouchStart(e) {
+        if (e.touches.length !== 1) return;
+        const touch = e.touches[0];
+        startX = touch.clientX;
+        startY = touch.clientY;
+        isDragging = false;
+        isScrolling = false;
+        activeCube = this;
 
-                if (isDragging) {
-                    e.preventDefault();
-                    moveDrag(touch.clientX, touch.clientY);
-                }
-            }
+        // Add visual feedback for touch
+        this.classList.add('touched');
+    }
 
-            function handleTouchEnd(e) {
-                if (activeCube) {
-                    activeCube.classList.remove('touched');
-                }
+    function handleTouchMove(e) {
+        if (!activeCube || e.touches.length !== 1) return;
 
-                if (isDragging) {
-                    endDrag();
-                }
-                
-                document.body.classList.remove('no-scroll');
+        const touch = e.touches[0];
+        const dx = touch.clientX - startX;
+        const dy = touch.clientY - startY;
+
+        if (!isDragging && !isScrolling) {
+            // Determine if it's a scroll or a drag
+            if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 5) {
+                isScrolling = true;
+                activeCube.classList.remove('touched');
                 activeCube = null;
-                isDragging = false;
-                isScrolling = false;
+                return;
+            } else if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 5) {
+                isDragging = true;
+                document.body.classList.add('no-scroll');
+                activeCube.classList.add('dragging');
+                startDrag(startX, startY, activeCube);
             }
-            
-            // Mouse event handlers
-            function handleMouseDown(e) {
-                if (e.button !== 0) return; // Only left mouse button
-                startDrag(e.clientX, e.clientY, this);
-                
-                const moveHandler = (e) => {
-                    moveDrag(e.clientX, e.clientY);
-                };
-                
-                const upHandler = () => {
-                    document.removeEventListener('mousemove', moveHandler);
-                    document.removeEventListener('mouseup', upHandler);
-                    endDrag();
-                };
-                
-                document.addEventListener('mousemove', moveHandler);
-                document.addEventListener('mouseup', upHandler);
-            }
-            
-            function handleDragStart(e) {
-                // Only needed for desktop drag and drop
-                e.preventDefault();
-            }
-            
-            // Drag and drop functions
-            function startDrag(clientX, clientY, cube) {
-                const rect = cube.getBoundingClientRect();
-                offsetX = clientX - rect.left;
-                offsetY = clientY - rect.top;
+        }
 
-                // Move to body for smooth dragging
-                if (cube.parentElement !== document.body) {
-                    document.body.appendChild(cube);
-                    // Adjust position after moving to body
-                    const scrollY = window.scrollY || document.documentElement.scrollTop;
-                    const scrollX = window.scrollX || document.documentElement.scrollLeft;
-                    cube.style.left = `${clientX - offsetX + scrollX}px`;
-                    cube.style.top = `${clientY - offsetY + scrollY}px`;
-                }
-                moveDrag(clientX, clientY);
-            }
-            
-            function moveDrag(clientX, clientY) {
-                if (!activeCube) return;
-                
-                // Calculate new position
-                const x = clientX - offsetX - window.scrollX;
-                const y = clientY - offsetY - window.scrollY;
-                
-                // Update cube position
-                activeCube.style.left = `${x}px`;
-                activeCube.style.top = `${y}px`;
-                
-                // Highlight drop zones
-                const cubeRect = activeCube.getBoundingClientRect();
-                const cubeCenterX = cubeRect.left + (cubeRect.width / 2);
-                const cubeCenterY = cubeRect.top + (cubeRect.height / 2);
-                
-                // Check if over combining area
-                const combiningRect = combiningArea.getBoundingClientRect();
-                const isOverCombining = (
-                    cubeCenterX >= combiningRect.left &&
-                    cubeCenterX <= combiningRect.right &&
-                    cubeCenterY >= combiningRect.top &&
-                    cubeCenterY <= combiningRect.bottom
-                );
-                
-                // Visual feedback for drop zones
-                if (isOverCombining) {
-                    combiningArea.classList.add('drag-over');
-                } else {
-                    combiningArea.classList.remove('drag-over');
-                }
-            }
-            
-            function endDrag() {
-                if (!activeCube) return;
+        if (isDragging) {
+            e.preventDefault();
+            moveDrag(touch.clientX, touch.clientY);
+        }
+    }
 
-                if (isDragging) {
-                    activeCube.classList.remove('dragging');
-                    handleDrop();
-                }
-                document.body.classList.remove('no-scroll'); // Always re-enable scrolling on endDrag
-                
-                activeCube = null;
-                isDragging = false;
-                clearDropZoneHighlights();
+    function handleTouchEnd(e) {
+        if (activeCube) {
+            activeCube.classList.remove('touched');
+        }
+
+        if (isDragging) {
+            endDrag();
+        }
+        
+        document.body.classList.remove('no-scroll');
+        activeCube = null;
+        isDragging = false;
+        isScrolling = false;
+    }
+    
+    // Mouse event handlers
+    function handleMouseDown(e) {
+        if (e.button !== 0) return; // Only left mouse button
+        activeCube = this;
+        isDragging = true;
+
+        document.body.classList.add('no-scroll');
+        activeCube.classList.add('dragging');
+        startDrag(e.clientX, e.clientY, this);
+
+        const moveHandler = (e) => {
+            if (isDragging) {
+                moveDrag(e.clientX, e.clientY);
             }
-            
-            // Combine two cubes
-            function combineCubes(cube1, cube2) {
-                const value1 = parseInt(cube1.dataset.value);
-                const value2 = parseInt(cube2.dataset.value);
-                const newValue = value1 + value2;
-                
-                // Get position of the cube that was dropped onto (cube2)
-                const container = cube2.parentElement;
-                const rect = cube2.getBoundingClientRect();
-                const containerRect = container.getBoundingClientRect();
-                
-                // Calculate position relative to container
-                const x = rect.left - containerRect.left;
-                const y = rect.top - containerRect.top;
-                
-                // Remove the original cubes
-                cube1.remove();
-                cube2.remove();
-                
-                // Create a new combined cube at the exact position of cube2
-                const newCube = createCube(x, y, newValue, container);
-                // Add a pop animation to celebrate combining
-                newCube.classList.add('pop');
-                newCube.addEventListener('animationend', () => {
-                    newCube.classList.remove('pop');
-                }, { once: true });
-                
-                // Update highest value if needed
-                if (newValue > highestValue) {
-                    highestValue = newValue;
-                    document.title = `Block Playground 🧱 - ${highestValue}`;
-                }
-                
-                // Update cube count (we removed 2 cubes and added 1)
-                updateCubeCount(-1);
-                
-                // Don't check for additional combinations to prevent unwanted movements
+        };
+
+        const upHandler = () => {
+            if (isDragging) {
+                endDrag();
             }
+            document.removeEventListener('mousemove', moveHandler);
+            document.removeEventListener('mouseup', upHandler);
+        };
+
+        document.addEventListener('mousemove', moveHandler);
+        document.addEventListener('mouseup', upHandler);
+    }
+    
+    // Update cube appearance based on value
+    function updateCubeAppearance(cube) {
+        const value = parseInt(cube.dataset.value);
+        const styles = getCubeStyle(value);
+        Object.assign(cube.style, styles);
+        if (styles.width) {
+            cube.style.setProperty('--size', styles.width);
+        }
+    }
+    
+    // Update cube counter
+    function updateCubeCount(change) {
+        cubeCount += change;
+        cubeCountElement.textContent = cubeCount;
+        
+        // Update cube count display
+        const cubesInArea = cubeArea.querySelectorAll('.cube').length;
+        cubeCountDisplay.textContent = `(${cubesInArea}/6)`;
+    }
+    
+    // Update cube count display
+    function updateCubeCountDisplay() {
+        const cubesInArea = cubeArea.querySelectorAll('.cube').length;
+        cubeCountDisplay.textContent = `(${cubesInArea}/6)`;
+    }
+    
+    // Reset the game
+    function resetGame() {
+        if (confirm('Start over? This will clear your blocks so you can play again!')) {
+            // Remove all cubes
+            const cubes = document.querySelectorAll('.cube');
+            cubes.forEach(cube => cube.remove());
             
-            // Check for possible combinations with the dropped cube
-            // This function is kept for reference but not used to prevent automatic combinations
-            function checkForCombinations(droppedCube) {
+            // Reset counters
+            cubeCount = 0;
+            highestValue = 0;
+            cubeCountElement.textContent = '0';
+            document.title = 'Block Playground ';
                 // Intentionally left empty to prevent automatic combinations
                 // Cubes will only combine when explicitly dropped onto each other
             }
